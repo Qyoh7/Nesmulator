@@ -2,6 +2,6 @@
 
 int main()
 {
-    Nesmulator emulator("/home/zayden2/personal/projects/Nesmulator/TestRoms/2_ReadWrite.nes");
-    emulator.test2();
+    Nesmulator emulator("/home/zayden2/personal/projects/Nesmulator/TestRoms/4_TheStack.nes");
+    emulator.test3();
 }
