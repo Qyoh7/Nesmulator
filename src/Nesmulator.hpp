@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
-#include <locale>
-#include <stack>
 #include <string>
 
 typedef uint8_t byte;
@@ -137,6 +135,11 @@ class Nesmulator
                     }
                     break;
 
+                case 0x18: // CLC
+                    flagCarry = false;
+                    cycles = 2;
+                    break;
+
                 case 0x20: // JSR
                     tempLow = read(programCounter);
                     programCounter++;
@@ -159,6 +162,11 @@ class Nesmulator
                     else {
                         cycles = 2;
                     }
+                    break;
+
+                case 0x38: // SEC
+                    flagCarry = true;
+                    cycles = 2;
                     break;
 
                 case 0x48: // PHA
@@ -234,6 +242,18 @@ class Nesmulator
                     cycles = 3;
                     break;
 
+                case 0x88: // DEY
+                    Y--;
+                    updateFlags(Y);
+                    cycles = 2;
+                    break;
+
+                case 0x8A: // TXA
+                    A = X;
+                    updateFlags(A);
+                    cycles = 2;
+                    break;
+
                 case 0x8C: // STY Absolute
                     tempLow = read(programCounter);
                     programCounter++;
@@ -274,6 +294,17 @@ class Nesmulator
                     }
                     break;
 
+                case 0x98: // TYA
+                    A = Y;
+                    updateFlags(A);
+                    cycles = 2;
+                    break;
+
+                case 0x9A: // TXS
+                    stackPointer = static_cast<unsigned short>(X);
+                    cycles = 2;
+                    break;
+
                 case 0xA0: // LDY Immediate
                     Y = read(programCounter);
                     programCounter++;
@@ -296,10 +327,22 @@ class Nesmulator
                     cycles = 3;
                     break;
 
+                case 0xA8: // TAY
+                    Y = A;
+                    updateFlags(Y);
+                    cycles = 2;
+                    break;
+
                 case 0xA9: // LDA Immediate
                     A = read(programCounter);
                     programCounter++;
                     updateFlags(A);
+                    cycles = 2;
+                    break;
+
+                case 0xAA: // TAX
+                    X = A;
+                    updateFlags(X);
                     cycles = 2;
                     break;
 
@@ -325,9 +368,22 @@ class Nesmulator
                     }
                     break;
 
-                case 0xCA: // DEX (implied)
+                case 0xBA: // TSX
+                    X = static_cast<byte>(stackPointer);
+                    updateFlags(X);
+                    cycles = 2;
+                    break;
+
+                case 0xC8: // INY
+                    Y++;
+                    updateFlags(Y);
+                    cycles = 2;
+                    break; 
+
+                case 0xCA: // DEX
                     X--;
                     updateFlags(X);
+                    cycles = 2;
                     break;
 
                 case 0xD0: // BNE
