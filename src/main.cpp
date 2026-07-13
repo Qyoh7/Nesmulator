@@ -3,5 +3,5 @@
 int main()
 {
     Nesmulator emulator("/home/zayden2/personal/projects/Nesmulator/TestRoms/4_TheStack.nes");
-    emulator.test3();
+    emulator.test4();
 }

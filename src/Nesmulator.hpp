@@ -1,3 +1,5 @@
+#include "TraceLogger.hpp"
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <array>
@@ -7,16 +9,14 @@
 #include <string>
 
 typedef uint8_t byte;
-
+typedef uint16_t word;
 
 class Nesmulator
 {
     private:
-        // its 1am
-        bool yeah = true;
-        bool nah = false;
+        TraceLogger traceLogger;
 
-        unsigned short programCounter; 
+        word programCounter; 
         byte stackPointer;
         unsigned int cycles; // CPU cycles taken to excecute an instruction
         byte A; // Math & Bitwise operations
@@ -47,7 +47,7 @@ class Nesmulator
             {
                 signedVal -= 256;
             }
-            programCounter = static_cast<unsigned short>(programCounter + signedVal);
+            programCounter = static_cast<word>(programCounter + signedVal);
         }
 
     public:
@@ -71,17 +71,27 @@ class Nesmulator
             flagNegative = false;
         }
 
-        byte read(unsigned short address)
+        void run()
+        {
+            while (!cpuHalted)
+            {
+                std::cout << traceLogger.logLine(programCounter, read(programCounter), A, X, Y, stackPointer) << "\n";
+                emulateCpu();
+            }
+        }
+
+        byte read(word address)
         {
             if (address < 0x0800) return RAM[address];
             else if (address >= 0x8000) return ROM[address - 0x8000];
             else {
                 std::cerr << "Unable to read, Address " << address << " is out of bounds!\n";
+                exit(EXIT_FAILURE);
                 return 0;
             }
         }
 
-        void write(unsigned short address, byte value)
+        void write(word address, byte value)
         {
             if (address < 0x800) RAM[address] = value;
             else {
@@ -89,62 +99,56 @@ class Nesmulator
             }
         }
 
-        void push(byte value)
-        {
-            write(static_cast<unsigned short>(0x100 + stackPointer), value);
-            stackPointer--;
-        }
-
-        byte pull()
-        {
-            stackPointer++;
-            return read(static_cast<unsigned short>(0x100 + stackPointer));
-        }
-
-        void run()
-        {
-            while (!cpuHalted)
-            {
-                emulateCpu();
-            }
-        }
         void updateFlags(byte& reg)
         {
             flagZero = (reg == 0);
             flagNegative = (reg > 127);
         }
 
-        // all the things
-
-        unsigned short parseAddress(byte lowByte, byte highByte)
+        void push(byte value)
         {
-            return static_cast<unsigned short>((highByte * 0x100) + lowByte);
+            write(static_cast<word>(0x100 + stackPointer), value);
+            stackPointer--;
+        }
+
+        byte pull()
+        {
+            stackPointer++;
+            return read(static_cast<word>(0x100 + stackPointer));
+        }
+
+        word pullWord()
+        {
+            byte low = pull();
+            byte high = pull();
+            return parseAddress(low, high);
+        }
+
+        word parseAddress(byte lowByte, byte highByte)
+        {
+            return static_cast<word>((highByte * 0x100) + lowByte);
         }
         
-        unsigned short readOperandsAbsolute(bool incPC = true)
+        byte readByte(bool incPC = true)
         {
-            byte tempLow;
-            byte tempHigh;
-            tempLow = read(programCounter);
-            programCounter++;
-            tempHigh = read(programCounter);
-            if (incPC) programCounter++;
-            return parseAddress(tempLow, tempHigh);
-        }
-
-        byte readOperandsZeroPage(bool incPC = true)
-        {
-            byte operand;
-            operand = read(programCounter);
+            byte operand = read(programCounter);
             if (incPC) programCounter++;
             return operand;
+        }
+
+        word readWord(bool incPC = true)
+        {
+            byte low = read(programCounter++);
+            byte high = read(programCounter);
+            if (incPC) programCounter++;
+            return parseAddress(low, high);
         }
 
         void emulateCpu()
         {
             byte opCode = read(programCounter);
             byte tempByte;
-            byte tempAddress;
+            word tempAddress;
             programCounter++;
             switch (opCode)
             {
@@ -196,7 +200,7 @@ class Nesmulator
                     break;
 
                 case 0x20: // JSR
-                    tempAddress = readOperandsAbsolute(false);
+                    tempAddress = readWord(false);
                     push(static_cast<byte>(programCounter / 0x100)); // Push PCH
                     push(static_cast<byte>(programCounter)); // Push PCL
                     programCounter = tempAddress;
@@ -239,7 +243,7 @@ class Nesmulator
                     break;
 
                 case 0x4C: // JMP (absolute)
-                    tempAddress = readOperandsAbsolute(false);
+                    tempAddress = readWord(false);
                     programCounter = tempAddress;
                     cycles = 3;
                     break;
@@ -263,7 +267,7 @@ class Nesmulator
                     break;
 
                 case 0x60: // RTS
-                    programCounter = parseAddress(pull(), pull());
+                    programCounter = pullWord();
                     programCounter++;
                     cycles = 6;
                     break;
@@ -293,19 +297,19 @@ class Nesmulator
                     break;
 
                 case 0x84: // STY Zero Page
-                    tempByte = readOperandsZeroPage();
+                    tempByte = readByte();
                     write(tempByte, Y);
                     cycles = 3;
                     break;
 
                 case 0x85: // STA Zero Page
-                    tempByte = readOperandsZeroPage();
+                    tempByte = readByte();
                     write(tempByte, A);
                     cycles = 3;
                     break;
 
                 case 0x86: // STX Zero Page
-                    tempByte = readOperandsZeroPage();
+                    tempByte = readByte();
                     write(tempByte, X);
                     cycles = 3;
                     break;
@@ -323,19 +327,19 @@ class Nesmulator
                     break;
 
                 case 0x8C: // STY Absolute
-                    tempAddress = readOperandsAbsolute();
+                    tempAddress = readWord();
                     write(tempAddress, Y);
                     cycles = 4;
                     break;
 
                 case 0x8D: // STA Absolute
-                    tempAddress = readOperandsAbsolute();
+                    tempAddress = readWord();
                     write(tempAddress, A);
                     cycles = 4;
                     break;
 
                 case 0x8E: // STX Absolute
-                    tempAddress = readOperandsAbsolute();
+                    tempAddress = readWord();
                     write(tempAddress, X);
                     cycles = 4;
                     break;
@@ -360,24 +364,24 @@ class Nesmulator
                     break;
 
                 case 0x9A: // TXS
-                    stackPointer = static_cast<unsigned short>(X);
+                    stackPointer = static_cast<word>(X);
                     cycles = 2;
                     break;
 
                 case 0xA0: // LDY Immediate
-                    Y = readOperandsZeroPage();
+                    Y = readByte();
                     updateFlags(Y);
                     cycles = 2;
                     break;
 
                 case 0xA2: // LDX Immediate
-                    X = readOperandsZeroPage();
+                    X = readByte();
                     updateFlags(X);
                     cycles = 2;
                     break;
 
                 case 0xA5: // LDA Zero Page
-                    A = readOperandsZeroPage();
+                    A = read(readByte());
                     updateFlags(A);
                     cycles = 3;
                     break;
@@ -389,7 +393,7 @@ class Nesmulator
                     break;
 
                 case 0xA9: // LDA Immediate
-                    A = readOperandsZeroPage();
+                    A = readByte();
                     updateFlags(A);
                     cycles = 2;
                     break;
@@ -401,7 +405,7 @@ class Nesmulator
                     break;
 
                 case 0xAD: // LDA Absolute
-                    A = readOperandsAbsolute();
+                    A = read(readWord());
                     updateFlags(A);
                     break;
 
@@ -489,7 +493,8 @@ class Nesmulator
 
 
                 default:
-                    std::cerr << "Invalid opcode: $" << std::hex << static_cast<int>(opCode) << "\n";
+                    std::cerr << "Invalid opcode: $" << traceLogger.hex8(opCode) << "\n";
+                    exit(EXIT_FAILURE);
                     break;
             }
         }
@@ -508,8 +513,7 @@ class Nesmulator
             byte PCH = read(0xFFFD); // PC high byte
 
             // Since PC is in little endian, shift the high byte two decimal places to the left, then add the low byte. Neat!
-            programCounter = static_cast<unsigned short>((PCH * 0x100) + PCL);
-            std::cout << std::hex << "PC: " << static_cast<int>(programCounter) << "\n";
+            programCounter = static_cast<word>((PCH * 0x100) + PCL);
 
             run();
         }
@@ -517,27 +521,31 @@ class Nesmulator
         void test1()
         {
             reset();
-            std::cout << "A register: " << std::hex << static_cast<int>(A) << "\n";
-            std::cout << "X register: " << std::hex << static_cast<int>(X) << "\n";
-            std::cout << "Y register: " << std::hex << static_cast<int>(Y) << "\n";
         }
 
         void test2()
         {
             reset();
+            std::cout << "\n" << "=====TEST RESULTS=====\n";
+            std::cout << "A register: " << std::hex << static_cast<int>(A) << "\n";
             std::cout << "X register: " << std::hex << static_cast<int>(X) << "\n";
             std::cout << "Y register: " << std::hex << static_cast<int>(Y) << "\n";
-            std::cout << "Address 0x0000 (should read $5a): " << std::hex << static_cast<int>(read(0x0)) << "\n";
-            std::cout << "Address 0x0550 (should read $80): " << std::hex << static_cast<int>(read(0x0)) << "\n";
-            std::cout << "A register (should read 5a): " << std::hex << static_cast<int>(A) << "\n";
-            std::cout << "Address 0x0001 (should read 5a): " << std::hex << static_cast<int>(read(0x1)) << "\n";
-            std::cout << "Address 0x0002 (should read 5a): " << std::hex << static_cast<int>(read(0x2)) << "\n";
+            std::cout << "Address 0x0000 (should read $5A): " << std::hex << static_cast<int>(read(0x0)) << "\n";
+            std::cout << "Address 0x0001 (should read $5A): " << std::hex << static_cast<int>(read(0x0001)) << "\n";
+            std::cout << "Address 0x0002 (should read $80): " << std::hex << static_cast<int>(read(0x0002)) << "\n";
+            std::cout << "Address 0x0550 (should read $80): " << std::hex << static_cast<int>(read(0x0550)) << "\n";
         }
         void test3()
         {
             reset();
             std::cout << "Address 0x0000 (should read $01) " << std::hex << static_cast<int>(read(0x0)) << "\n";
             std::cout << "Final PC Location (should be $8017) " << std::hex << static_cast<int>(programCounter) << "\n";
+        }
+
+        void test4()
+        {
+            reset();
+            std::cout << "Address 0x0000 (should read $01) " << std::hex << static_cast<int>(read(0x0)) << "\n";
         }
 
 };
