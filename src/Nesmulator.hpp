@@ -7,9 +7,15 @@
 #include <string>
 
 typedef uint8_t byte;
+
+
 class Nesmulator
 {
     private:
+        // its 1am
+        bool yeah = true;
+        bool nah = false;
+
         unsigned short programCounter; 
         byte stackPointer;
         unsigned int cycles; // CPU cycles taken to excecute an instruction
@@ -108,12 +114,37 @@ class Nesmulator
             flagNegative = (reg > 127);
         }
 
+        // all the things
+
+        unsigned short parseAddress(byte lowByte, byte highByte)
+        {
+            return static_cast<unsigned short>((highByte * 0x100) + lowByte);
+        }
+        
+        unsigned short readOperandsAbsolute(bool incPC = true)
+        {
+            byte tempLow;
+            byte tempHigh;
+            tempLow = read(programCounter);
+            programCounter++;
+            tempHigh = read(programCounter);
+            if (incPC) programCounter++;
+            return parseAddress(tempLow, tempHigh);
+        }
+
+        byte readOperandsZeroPage(bool incPC = true)
+        {
+            byte operand;
+            operand = read(programCounter);
+            if (incPC) programCounter++;
+            return operand;
+        }
+
         void emulateCpu()
         {
             byte opCode = read(programCounter);
-            byte temp;
-            byte tempLow;
-            byte tempHigh;
+            byte tempByte;
+            byte tempAddress;
             programCounter++;
             switch (opCode)
             {
@@ -121,13 +152,37 @@ class Nesmulator
                     cpuHalted = true;
                     break;
 
+                case 0x06: // ASL (zero page)
+                    
+                    break;
+                case 0x08: // PHP
+                    tempByte = 0;
+                    tempByte |= (flagCarry ? 0b00000001 : 0b0); 
+                    tempByte |= (flagZero ? 0b00000010 : 0b0); 
+                    tempByte |= (flagInterruptDisable ? 0b00000100 : 0b0); 
+                    tempByte |= (flagDecimal ? 0b00001000 : 0b0);
+                    tempByte |= 0b00010000; // Break (pushes 1 because this is a PHP instruction)
+                    tempByte |= 0b00100001; // Who fuckin knows dawg
+                    tempByte |= (flagOverflow ? 0b01000000 : 0b0);
+                    tempByte |= (flagNegative ? 0b10000000 : 0b0);
+                    push(tempByte);
+                    cycles = 3;
+                    break;
+
+                case 0x0A: // ASL A
+                    flagCarry = (A & 0b10000000) == 1;
+                    A <<= 1;
+                    updateFlags(A);
+                    cycles = 2;
+                    break;
+
                 case 0x10: // BPL
                     // temp is a signed value
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (!flagNegative)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -141,22 +196,31 @@ class Nesmulator
                     break;
 
                 case 0x20: // JSR
-                    tempLow = read(programCounter);
-                    programCounter++;
-                    tempHigh = read(programCounter);
+                    tempAddress = readOperandsAbsolute(false);
                     push(static_cast<byte>(programCounter / 0x100)); // Push PCH
                     push(static_cast<byte>(programCounter)); // Push PCL
-                    programCounter = static_cast<unsigned short>((tempHigh * 0x100) + tempLow);
+                    programCounter = tempAddress;
                     cycles = 6;
+                    break;
+
+                case 0x28: // PLP
+                    tempByte = pull();
+                    flagCarry =            (tempByte & 0b00000001) == 1;
+                    flagZero =             (tempByte & 0b00000010) == 1;
+                    flagInterruptDisable = (tempByte & 0b00000100) == 1;
+                    flagDecimal =          (tempByte & 0b00100000) == 1;
+                    flagOverflow =         (tempByte & 0b01000000) == 1;
+                    flagNegative =         (tempByte & 0b10000000) == 1;
+                    cycles = 3;
                     break;
 
                 case 0x30: // BMI
                     // temp is a signed value
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (flagNegative)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -175,19 +239,17 @@ class Nesmulator
                     break;
 
                 case 0x4C: // JMP (absolute)
-                    tempLow = read(programCounter);
-                    programCounter++;
-                    tempHigh = read(programCounter);
-                    programCounter = static_cast<unsigned short>((tempHigh * 0x100) + tempLow);
+                    tempAddress = readOperandsAbsolute(false);
+                    programCounter = tempAddress;
                     cycles = 3;
                     break;
 
                 case 0x50: // BVC
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (!flagOverflow)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -195,25 +257,29 @@ class Nesmulator
                     }
                     break;
 
+                case 0x58: // CLI
+                    flagInterruptDisable = false;
+                    cycles = 2;
+                    break;
+
                 case 0x60: // RTS
-                    tempLow = pull();
-                    tempHigh = pull();
-                    programCounter = static_cast<unsigned short>((tempHigh * 0x100) + tempLow);
+                    programCounter = parseAddress(pull(), pull());
                     programCounter++;
                     cycles = 6;
                     break;
-                case 0x68:
+
+                case 0x68: // PLA
                     A = pull();
                     updateFlags(A);
                     cycles = 4;
                     break;
 
                 case 0x70: // BVS
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (flagOverflow)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -221,24 +287,26 @@ class Nesmulator
                     }
                     break;
 
+                case 0x78: // SEI
+                    flagInterruptDisable = true;
+                    cycles = 2;
+                    break;
+
                 case 0x84: // STY Zero Page
-                    temp = read(programCounter);
-                    programCounter++;
-                    write(temp, Y);
+                    tempByte = readOperandsZeroPage();
+                    write(tempByte, Y);
                     cycles = 3;
                     break;
 
                 case 0x85: // STA Zero Page
-                    temp = read(programCounter);
-                    programCounter++;
-                    write(temp, A);
+                    tempByte = readOperandsZeroPage();
+                    write(tempByte, A);
                     cycles = 3;
                     break;
 
                 case 0x86: // STX Zero Page
-                    temp = read(programCounter);
-                    programCounter++;
-                    write(temp, X);
+                    tempByte = readOperandsZeroPage();
+                    write(tempByte, X);
                     cycles = 3;
                     break;
 
@@ -255,38 +323,29 @@ class Nesmulator
                     break;
 
                 case 0x8C: // STY Absolute
-                    tempLow = read(programCounter);
-                    programCounter++;
-                    tempHigh = read(programCounter);
-                    programCounter++;
-                    write(static_cast<unsigned short>((tempHigh * 0x100) + tempLow), Y);
+                    tempAddress = readOperandsAbsolute();
+                    write(tempAddress, Y);
                     cycles = 4;
                     break;
 
                 case 0x8D: // STA Absolute
-                    tempLow = read(programCounter);
-                    programCounter++;
-                    tempHigh = read(programCounter);
-                    programCounter++;
-                    write(static_cast<unsigned short>((tempHigh * 0x100) + tempLow), A);
+                    tempAddress = readOperandsAbsolute();
+                    write(tempAddress, A);
                     cycles = 4;
                     break;
 
                 case 0x8E: // STX Absolute
-                    tempLow = read(programCounter);
-                    programCounter++;
-                    tempHigh = read(programCounter);
-                    programCounter++;
-                    write(static_cast<unsigned short>((tempHigh * 0x100) + tempLow), X);
+                    tempAddress = readOperandsAbsolute();
+                    write(tempAddress, X);
                     cycles = 4;
                     break;
 
                 case 0x90: // BCC
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (!flagCarry)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -306,23 +365,19 @@ class Nesmulator
                     break;
 
                 case 0xA0: // LDY Immediate
-                    Y = read(programCounter);
-                    programCounter++;
+                    Y = readOperandsZeroPage();
                     updateFlags(Y);
                     cycles = 2;
                     break;
 
                 case 0xA2: // LDX Immediate
-                    X = read(programCounter);
-                    programCounter++;
+                    X = readOperandsZeroPage();
                     updateFlags(X);
                     cycles = 2;
                     break;
 
                 case 0xA5: // LDA Zero Page
-                    temp = read(programCounter);
-                    programCounter++;
-                    A = read(temp);
+                    A = readOperandsZeroPage();
                     updateFlags(A);
                     cycles = 3;
                     break;
@@ -334,8 +389,7 @@ class Nesmulator
                     break;
 
                 case 0xA9: // LDA Immediate
-                    A = read(programCounter);
-                    programCounter++;
+                    A = readOperandsZeroPage();
                     updateFlags(A);
                     cycles = 2;
                     break;
@@ -347,25 +401,26 @@ class Nesmulator
                     break;
 
                 case 0xAD: // LDA Absolute
-                    tempLow = read(programCounter);
-                    programCounter++;
-                    tempHigh = read(programCounter);
-                    programCounter++;
-                    A = read(static_cast<unsigned short>((tempHigh * 0x100) + tempLow));
+                    A = readOperandsAbsolute();
                     updateFlags(A);
                     break;
 
                 case 0xB0: // BCS
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (flagCarry)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
                         cycles = 2;
                     }
+                    break;
+
+                case 0xB8: // CLV
+                    flagOverflow = false;
+                    cycles = 2;
                     break;
 
                 case 0xBA: // TSX
@@ -387,16 +442,21 @@ class Nesmulator
                     break;
 
                 case 0xD0: // BNE
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (!flagZero)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
                         cycles = 2;
                     }
+                    break;
+
+                case 0xD8: // CLD
+                    flagDecimal = false;
+                    cycles = 2;
                     break;
 
                 case 0xE8: // INX (implied)
@@ -405,18 +465,28 @@ class Nesmulator
                     cycles = 2;
                     break;
 
+                case 0xEA: // NOP
+                    cycles = 2;
+                    break;
+
                 case 0xF0: // BEQ
-                    temp = read(programCounter);
+                    tempByte = read(programCounter);
                     programCounter++;
                     if (flagZero)
                     {
-                        branch(temp);
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
                         cycles = 2;
                     }
                     break;
+
+                case 0xF8: // SED
+                    flagDecimal = true;
+                    cycles = 2;
+                    break;
+
 
                 default:
                     std::cerr << "Invalid opcode: $" << std::hex << static_cast<int>(opCode) << "\n";
