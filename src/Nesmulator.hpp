@@ -99,10 +99,10 @@ class Nesmulator
             }
         }
 
-        void updateFlags(byte& reg)
+        void updateFlagsZN(byte& value)
         {
-            flagZero = (reg == 0);
-            flagNegative = (reg > 127);
+            flagZero = (value == 0);
+            flagNegative = (value > 127);
         }
 
         void push(byte value)
@@ -144,6 +144,32 @@ class Nesmulator
             return parseAddress(low, high);
         }
 
+        byte opASL(byte value)
+        {
+            flagCarry = (value & 0b10000000);
+            byte shifted = value <<= 1;
+            updateFlagsZN(shifted);
+            return shifted;
+        }
+
+        byte opROL(byte value)
+        {
+            bool oldCarry = flagCarry;
+            flagCarry = (value & 0b10000000);
+            value = (value << 1) | oldCarry;
+            updateFlagsZN(value);
+            return value;
+        }
+
+        byte opROR(byte value)
+        {
+            bool oldCarry = flagCarry;
+            flagCarry = (value & 0b00000001);
+            value = (value >> 1) | (oldCarry << 7);
+            updateFlagsZN(value);
+            return value;
+        }
+
         void emulateCpu()
         {
             byte opCode = read(programCounter);
@@ -156,9 +182,14 @@ class Nesmulator
                     cpuHalted = true;
                     break;
 
-                case 0x06: // ASL (zero page)
-                    
+                case 0x06: // ASL Zero page
+                    // TODO: This is probably broken
+                    tempAddress = readByte();
+                    tempByte = read(tempAddress);
+                    write(tempAddress, opASL(tempByte));
+                    cycles = 5;
                     break;
+
                 case 0x08: // PHP
                     tempByte = 0;
                     tempByte |= (flagCarry ? 0b00000001 : 0b0); 
@@ -166,7 +197,7 @@ class Nesmulator
                     tempByte |= (flagInterruptDisable ? 0b00000100 : 0b0); 
                     tempByte |= (flagDecimal ? 0b00001000 : 0b0);
                     tempByte |= 0b00010000; // Break (pushes 1 because this is a PHP instruction)
-                    tempByte |= 0b00100001; // Who fuckin knows dawg
+                    tempByte |= 0b00100000; // Who fuckin knows dawg
                     tempByte |= (flagOverflow ? 0b01000000 : 0b0);
                     tempByte |= (flagNegative ? 0b10000000 : 0b0);
                     push(tempByte);
@@ -174,10 +205,15 @@ class Nesmulator
                     break;
 
                 case 0x0A: // ASL A
-                    flagCarry = (A & 0b10000000) == 1;
-                    A <<= 1;
-                    updateFlags(A);
+                    A = opASL(A);
                     cycles = 2;
+                    break;
+
+                case 0x0E: // ASL Absolute
+                    tempAddress = readWord();
+                    tempByte = read(tempAddress);
+                    write(tempAddress, opASL(tempByte));
+                    cycles = 6;
                     break;
 
                 case 0x10: // BPL
@@ -207,15 +243,34 @@ class Nesmulator
                     cycles = 6;
                     break;
 
+                case 0x26: // ROL Zero Page
+                    tempAddress = readByte();
+                    tempByte = read(tempAddress);
+                    write(tempAddress, opROL(tempByte));
+                    cycles = 5;
+                    break;
+
                 case 0x28: // PLP
                     tempByte = pull();
-                    flagCarry =            (tempByte & 0b00000001) == 1;
-                    flagZero =             (tempByte & 0b00000010) == 1;
-                    flagInterruptDisable = (tempByte & 0b00000100) == 1;
-                    flagDecimal =          (tempByte & 0b00100000) == 1;
-                    flagOverflow =         (tempByte & 0b01000000) == 1;
-                    flagNegative =         (tempByte & 0b10000000) == 1;
+                    flagCarry =            (tempByte & 0b00000001);
+                    flagZero =             (tempByte & 0b00000010);
+                    flagInterruptDisable = (tempByte & 0b00000100);
+                    flagDecimal =          (tempByte & 0b00100000);
+                    flagOverflow =         (tempByte & 0b01000000);
+                    flagNegative =         (tempByte & 0b10000000);
                     cycles = 3;
+                    break;
+
+                case 0x2A: // ROL A
+                    A = opROL(A);
+                    cycles = 2;
+                    break;
+
+                case 0x2E: // ROL Absolute
+                    tempAddress = readWord();
+                    tempByte = read(tempAddress);
+                    write(tempAddress, opROL(tempByte));
+                    cycles = 6;
                     break;
 
                 case 0x30: // BMI
@@ -274,7 +329,7 @@ class Nesmulator
 
                 case 0x68: // PLA
                     A = pull();
-                    updateFlags(A);
+                    updateFlagsZN(A);
                     cycles = 4;
                     break;
 
@@ -316,13 +371,13 @@ class Nesmulator
 
                 case 0x88: // DEY
                     Y--;
-                    updateFlags(Y);
+                    updateFlagsZN(Y);
                     cycles = 2;
                     break;
 
                 case 0x8A: // TXA
                     A = X;
-                    updateFlags(A);
+                    updateFlagsZN(A);
                     cycles = 2;
                     break;
 
@@ -359,7 +414,7 @@ class Nesmulator
 
                 case 0x98: // TYA
                     A = Y;
-                    updateFlags(A);
+                    updateFlagsZN(A);
                     cycles = 2;
                     break;
 
@@ -370,43 +425,43 @@ class Nesmulator
 
                 case 0xA0: // LDY Immediate
                     Y = readByte();
-                    updateFlags(Y);
+                    updateFlagsZN(Y);
                     cycles = 2;
                     break;
 
                 case 0xA2: // LDX Immediate
                     X = readByte();
-                    updateFlags(X);
+                    updateFlagsZN(X);
                     cycles = 2;
                     break;
 
                 case 0xA5: // LDA Zero Page
                     A = read(readByte());
-                    updateFlags(A);
+                    updateFlagsZN(A);
                     cycles = 3;
                     break;
 
                 case 0xA8: // TAY
                     Y = A;
-                    updateFlags(Y);
+                    updateFlagsZN(Y);
                     cycles = 2;
                     break;
 
                 case 0xA9: // LDA Immediate
                     A = readByte();
-                    updateFlags(A);
+                    updateFlagsZN(A);
                     cycles = 2;
                     break;
 
                 case 0xAA: // TAX
                     X = A;
-                    updateFlags(X);
+                    updateFlagsZN(X);
                     cycles = 2;
                     break;
 
                 case 0xAD: // LDA Absolute
                     A = read(readWord());
-                    updateFlags(A);
+                    updateFlagsZN(A);
                     break;
 
                 case 0xB0: // BCS
@@ -429,19 +484,19 @@ class Nesmulator
 
                 case 0xBA: // TSX
                     X = static_cast<byte>(stackPointer);
-                    updateFlags(X);
+                    updateFlagsZN(X);
                     cycles = 2;
                     break;
 
                 case 0xC8: // INY
                     Y++;
-                    updateFlags(Y);
+                    updateFlagsZN(Y);
                     cycles = 2;
                     break; 
 
                 case 0xCA: // DEX
                     X--;
-                    updateFlags(X);
+                    updateFlagsZN(X);
                     cycles = 2;
                     break;
 
@@ -465,7 +520,7 @@ class Nesmulator
 
                 case 0xE8: // INX (implied)
                     X++;
-                    updateFlags(X);
+                    updateFlagsZN(X);
                     cycles = 2;
                     break;
 
