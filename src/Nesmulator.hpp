@@ -23,6 +23,9 @@ class Nesmulator
         byte X; // Indexing & Counting
         byte Y; // Indexing & Counting
 
+        byte tempByte;
+        word tempAddress;
+
         std::array<byte, 0x800> RAM; // Address $0000 to $07FF
         std::array<byte, 0x8000> ROM; // Address $8000 to $FFFF
         std::array<byte, 0x10> header; // the iNES header, first 16 bytes in the rom
@@ -62,6 +65,9 @@ class Nesmulator
             cpuHalted = false;
             cycles = 0;
             stackPointer = 0xFD;
+
+            tempAddress = 0;
+            tempByte = 0;
 
             flagCarry = false;
             flagZero = false;
@@ -144,6 +150,18 @@ class Nesmulator
             return parseAddress(low, high);
         }
 
+        byte readOperandsZeroPage()
+        {
+            tempAddress = readByte();
+            return read(tempAddress);
+        }
+
+        byte readOperandsAbsolute()
+        {
+            tempAddress = readWord();
+            return read(tempAddress);
+        }
+
         byte opLSR(byte value)
         {
             flagCarry = (value & 0b1);
@@ -206,11 +224,57 @@ class Nesmulator
             return ret;
         }
 
+        byte opADC(byte value)
+        {
+            int sum = A + value + (flagCarry ? 1 : 0);
+            flagCarry = sum > 0xFF;
+            flagOverflow = (~(A ^ value) & (A ^ sum) & 0x80) != 0;
+            byte ret = static_cast<byte>(sum);
+            updateFlagsZN(ret);
+            return ret;
+        }
+
+        byte opSBC(byte value)
+        {
+            int sum = A - value - (flagCarry ? 0 : 1);
+            flagCarry = sum >= 0x0;
+            flagOverflow = ((A ^ value) & (A ^ sum) & 0x80) != 0;
+            byte ret = static_cast<byte>(sum);
+            updateFlagsZN(ret);
+            return ret;
+        }
+
+        void opCMP(byte value)
+        {
+            flagCarry = A >= value;
+            flagZero = A == value;
+            flagNegative = (A - value) < 0;
+        }
+
+        void opCPX(byte value)
+        {
+            flagCarry = X >= value;
+            flagZero = X == value;
+            flagNegative = (X - value) < 0;
+        }
+
+        void opCPY(byte value)
+        {
+            flagCarry = Y >= value;
+            flagZero = Y == value;
+            flagNegative = (Y - value) < 0;
+        }
+
+        void opBIT(byte value)
+        {
+            flagZero = (A | value) == 0;
+            flagNegative = (value & 0b10000000) != 0;
+            flagOverflow = (value & 0b01000000) != 0;
+        }
+
         void emulateCpu()
         {
             byte opCode = read(programCounter);
-            byte tempByte;
-            word tempAddress;
             programCounter++;
             switch (opCode)
             {
@@ -219,16 +283,12 @@ class Nesmulator
                     break;
                 
                 case 0x05: // ORA Zero Page
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
-                    A = opORA(tempByte);
+                    A = opORA(readOperandsZeroPage());
                     cycles = 3;
                     break;
 
                 case 0x06: // ASL Zero page
-                    // TODO: This is probably broken
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsZeroPage();
                     write(tempAddress, opASL(tempByte));
                     cycles = 5;
                     break;
@@ -258,26 +318,19 @@ class Nesmulator
                     break;
                 
                 case 0x0D: // ORA Absolute
-                    tempAddress = readWord();
-                    tempByte = read(tempAddress);
-                    A = opORA(tempByte);
+                    A = opORA(readOperandsAbsolute());
                     cycles = 4;
                     break;
 
                 case 0x0E: // ASL Absolute
-                    tempAddress = readWord();
-                    tempByte = read(tempAddress);
-                    write(tempAddress, opASL(tempByte));
+                    write(tempAddress, opASL(readOperandsAbsolute()));
                     cycles = 6;
                     break;
 
                 case 0x10: // BPL
-                    // temp is a signed value
-                    tempByte = read(programCounter);
-                    programCounter++;
                     if (!flagNegative)
                     {
-                        branch(tempByte);
+                        branch(readByte());
                         cycles = 3;
                     }
                     else {
@@ -298,16 +351,18 @@ class Nesmulator
                     cycles = 6;
                     break;
 
+                case 0x24: // BIT Zero Page
+                    opBIT(readOperandsZeroPage());
+                    cycles = 3;
+                    break;
+
                 case 0x25: // AND Zero Page
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
-                    A = opAND(tempByte);
+                    A = opAND(readOperandsZeroPage());
                     cycles = 3;
                     break;
 
                 case 0x26: // ROL Zero Page
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsZeroPage();
                     write(tempAddress, opROL(tempByte));
                     cycles = 5;
                     break;
@@ -324,8 +379,7 @@ class Nesmulator
                     break;
                 
                 case 0x29: // AND Immediate
-                    tempByte = readByte();
-                    A = opORA(tempByte);
+                    A = opORA(readByte());
                     cycles = 2;
                     break;
 
@@ -334,27 +388,26 @@ class Nesmulator
                     cycles = 2;
                     break;
 
+                case 0x2C: // BIT Absolute
+                    opBIT(readOperandsAbsolute());
+                    cycles = 4;
+                    break;
+
                 case 0x2D: // AND Absolute
-                    tempAddress = readWord();
-                    tempByte = read(tempAddress);
-                    A = opAND(tempByte);
+                    A = opAND(readOperandsAbsolute());
                     cycles = 4;
                     break;
 
                 case 0x2E: // ROL Absolute
-                    tempAddress = readWord();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsAbsolute();
                     write(tempAddress, opROL(tempByte));
                     cycles = 6;
                     break;
 
                 case 0x30: // BMI
-                    // temp is a signed value
-                    tempByte = read(programCounter);
-                    programCounter++;
                     if (flagNegative)
                     {
-                        branch(tempByte);
+                        branch(readByte());
                         cycles = 3;
                     }
                     else {
@@ -368,15 +421,12 @@ class Nesmulator
                     break;
 
                 case 0x45: // EOR Zero Page
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
-                    A = opEOR(tempByte);
+                    A = opEOR(readOperandsZeroPage());
                     cycles = 3;
                     break;
 
                 case 0x46: // LSR Zero Page
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsZeroPage();
                     write(tempAddress, opLSR(tempByte));
                     cycles = 5;
                     break;
@@ -387,8 +437,7 @@ class Nesmulator
                     break;
 
                 case 0x49: // EOR Immediate
-                    tempByte = readByte();
-                    A = opEOR(tempByte);
+                    A = opEOR(readByte());
                     cycles = 2;
                     break;
 
@@ -397,25 +446,27 @@ class Nesmulator
                     cycles = 2;
                     break;
 
-                case 0x4C: // JMP (absolute)
+                case 0x4C: // JMP Absolute
                     tempAddress = readWord(false);
                     programCounter = tempAddress;
                     cycles = 3;
                     break;
+
+                case 0x4D: // EOR Absolute
+                    A = opEOR(readOperandsAbsolute());
+                    cycles = 4;
+                    break;
                 
                 case 0x4E: // LSR Absolute
-                    tempAddress = readWord();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsAbsolute();
                     write(tempAddress, opLSR(tempByte));
                     cycles = 6;
                     break;
 
                 case 0x50: // BVC
-                    tempByte = read(programCounter);
-                    programCounter++;
                     if (!flagOverflow)
                     {
-                        branch(tempByte);
+                        branch(readByte());
                         cycles = 3;
                     }
                     else {
@@ -433,11 +484,15 @@ class Nesmulator
                     programCounter++;
                     cycles = 6;
                     break;
+
+                case 0x65: // ADC Zero Page
+                    A = opADC(readOperandsZeroPage());
+                    cycles = 3;
+                    break;
                 
                 case 0x66: // ROR Zero Page
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
-                    write(tempAddress, (tempByte));
+                    tempByte = readOperandsZeroPage();
+                    write(tempAddress, tempByte);
                     cycles = 5;
                     break;
 
@@ -447,24 +502,31 @@ class Nesmulator
                     cycles = 4;
                     break;
 
+                case 0x69: // ADC Immediate
+                    A = opADC(readByte());
+                    cycles = 2;
+                    break;
+
                 case 0x6A: // ROR A
                     A = opROR(A);
                     cycles = 2;
                     break;
+
+                case 0x6D: // ADC Absolute
+                    A = opADC(readOperandsAbsolute());
+                    cycles = 4;
+                    break;
                 
                 case 0x6E: // ROR Absolute
-                    tempAddress = readWord();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsAbsolute();
                     write(tempAddress, opROR(tempByte));
                     cycles = 6;
                     break;
 
                 case 0x70: // BVS
-                    tempByte = read(programCounter);
-                    programCounter++;
                     if (flagOverflow)
                     {
-                        branch(tempByte);
+                        branch(readByte());
                         cycles = 3;
                     }
                     else {
@@ -478,8 +540,7 @@ class Nesmulator
                     break;
 
                 case 0x84: // STY Zero Page
-                    tempByte = readByte();
-                    write(tempByte, Y);
+                    write(readByte(), Y);
                     cycles = 3;
                     break;
 
@@ -614,16 +675,46 @@ class Nesmulator
                     cycles = 2;
                     break;
 
+                case 0xC0: // CPY Immediate
+                    opCPY(readByte());
+                    cycles = 2;
+                    break;
+                
+                case 0xC4: // CPY Zero Page
+                    opCPY(readOperandsZeroPage());
+                    cycles = 3;
+                    break;
+
+                case 0xC5: // CMP Zero Page
+                    opCMP(readOperandsZeroPage());
+                    cycles = 3;
+                    break;
+
                 case 0xC8: // INY
                     Y++;
                     updateFlagsZN(Y);
                     cycles = 2;
                     break; 
 
+                case 0xC9: // CMP Immediate
+                    opCMP(readByte());
+                    cycles = 2;
+                    break;
+
                 case 0xCA: // DEX
                     X--;
                     updateFlagsZN(X);
                     cycles = 2;
+                    break;
+
+                case 0xCC: // CPY Absolute
+                    opCPY(readOperandsAbsolute());
+                    cycles = 4;
+                    break;
+
+                case 0xCD: // CMP Absolute
+                    opCMP(readOperandsAbsolute());
+                    cycles = 4;
                     break;
 
                 case 0xD0: // BNE
@@ -644,9 +735,23 @@ class Nesmulator
                     cycles = 2;
                     break;
 
+                case 0xE0: // CPX Immediate
+                    opCPX(readByte());
+                    cycles = 2;
+                    break;
+
+                case 0xE4: // CPX Zero Page
+                    opCPX(readOperandsZeroPage());
+                    cycles = 3;
+                    break;
+
+                case 0xE5: // SBC Zero Page
+                    A = opSBC(readOperandsZeroPage());
+                    cycles = 3;
+                    break;
+
                 case 0xE6: // INC Zero Page
-                    tempAddress = readByte();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsZeroPage();
                     write(tempAddress, opINC(tempByte));
                     cycles = 5;
                     break;
@@ -657,23 +762,35 @@ class Nesmulator
                     cycles = 2;
                     break;
 
+                case 0xE9: // SBC Immediate
+                    A = opSBC(readByte());
+                    cycles = 2;
+                    break;
+
                 case 0xEA: // NOP
                     cycles = 2;
                     break;
 
+                case 0xEC: // CPX Absolute
+                    opCPX(readOperandsAbsolute());
+                    cycles = 4;
+                    break;
+
+                case 0xED: // SBC Absolute
+                    A = opSBC(readOperandsAbsolute());
+                    cycles = 4;
+                    break;
+
                 case 0xEE: // INC Absolute
-                    tempAddress = readWord();
-                    tempByte = read(tempAddress);
+                    tempByte = readOperandsAbsolute();
                     write(tempAddress, tempByte);
                     cycles = 6;
                     break;
 
                 case 0xF0: // BEQ
-                    tempByte = read(programCounter);
-                    programCounter++;
                     if (flagZero)
                     {
-                        branch(tempByte);
+                        branch(readByte());
                         cycles = 3;
                     }
                     else {
@@ -685,7 +802,6 @@ class Nesmulator
                     flagDecimal = true;
                     cycles = 2;
                     break;
-
 
                 default:
                     std::cerr << "Invalid opcode: $" << traceLogger.hex8(opCode) << "\n";
@@ -744,4 +860,3 @@ class Nesmulator
         }
 
 };
-
