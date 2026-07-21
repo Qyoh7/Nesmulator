@@ -275,9 +275,31 @@ class Nesmulator
         void emulateCpu()
         {
             byte opCode = read(programCounter);
+            byte tempLow;
+            byte tempHigh;
             programCounter++;
             switch (opCode)
             {
+                case 0x00: // BRK
+                    programCounter++;
+                    push(static_cast<byte>(programCounter >> 8));
+                    push(static_cast<byte>(programCounter));
+                    tempByte = 0;
+                    tempByte |= (flagCarry ? 0b00000001 : 0b0); 
+                    tempByte |= (flagZero ? 0b00000010 : 0b0); 
+                    tempByte |= (flagInterruptDisable ? 0b00000100 : 0b0); 
+                    tempByte |= (flagDecimal ? 0b00001000 : 0b0);
+                    tempByte |= 0b00010000; // Break (pushes 1 because this is a PHP instruction)
+                    tempByte |= 0b00100000; // Who knows dawg
+                    tempByte |= (flagOverflow ? 0b01000000 : 0b0);
+                    tempByte |= (flagNegative ? 0b10000000 : 0b0);
+                    push(tempByte);
+                    tempLow = read(0xFFFE);
+                    tempHigh = read(0xFFFF);
+                    programCounter = static_cast<word>((tempHigh * 0x100) + tempLow);
+                    cycles = 7;
+                    break;
+
                 case 0x02: // HLT
                     cpuHalted = true;
                     break;
@@ -418,6 +440,18 @@ class Nesmulator
                 case 0x38: // SEC
                     flagCarry = true;
                     cycles = 2;
+                    break;
+
+                case 0x40: // RTI
+                    tempByte = pull();
+                    flagCarry =            (tempByte & 0b00000001);
+                    flagZero =             (tempByte & 0b00000010);
+                    flagInterruptDisable = (tempByte & 0b00000100);
+                    flagDecimal =          (tempByte & 0b00100000);
+                    flagOverflow =         (tempByte & 0b01000000);
+                    flagNegative =         (tempByte & 0b10000000);
+                    programCounter = pullWord();
+                    cycles = 6;
                     break;
 
                 case 0x45: // EOR Zero Page
@@ -805,7 +839,6 @@ class Nesmulator
 
                 default:
                     std::cerr << "Invalid opcode: $" << traceLogger.hex8(opCode) << "\n";
-                    exit(EXIT_FAILURE);
                     break;
             }
         }
@@ -849,6 +882,7 @@ class Nesmulator
         void test3()
         {
             reset();
+            std::cout << "\n" << "=====TEST RESULTS=====\n";
             std::cout << "Address 0x0000 (should read $01) " << std::hex << static_cast<int>(read(0x0)) << "\n";
             std::cout << "Final PC Location (should be $8017) " << std::hex << static_cast<int>(programCounter) << "\n";
         }
@@ -856,7 +890,28 @@ class Nesmulator
         void test4()
         {
             reset();
+            std::cout << "\n" << "=====TEST RESULTS=====\n";
             std::cout << "Address 0x0000 (should read $01) " << std::hex << static_cast<int>(read(0x0)) << "\n";
+        }
+        
+        void test5()
+        {
+            reset();
+            std::cout << "\n" << "=====TEST RESULTS=====\n";
+
+            std::cout << "Address 0x0000 (should read $02) " << traceLogger.hex8(read(0x0)) << "\n";
+            std::cout << "Address 0x0001 (should read $01) " << traceLogger.hex8(read(0x1)) << "\n";
+            std::cout << "Address 0x0002 (should read $FD) " << traceLogger.hex8(read(0x2)) << "\n";
+            std::cout << "Address 0x0003 (should read $3D) " << traceLogger.hex8(read(0x3)) << "\n";
+            std::cout << "Address 0x0004 (should read $34) " << traceLogger.hex8(read(0x4)) << "\n";
+            std::cout << "Address 0x0005 (should read $05) " << traceLogger.hex8(read(0x5)) << "\n";
+            std::cout << "Address 0x0006 (should read $53) " << traceLogger.hex8(read(0x6)) << "\n";
+            std::cout << "Address 0x0007 (should read $11) " << traceLogger.hex8(read(0x7)) << "\n";
+            std::cout << "Address 0x0008 (should read $90) " << traceLogger.hex8(read(0x8)) << "\n";
+            std::cout << "Address 0x0009 (should read $F0) " << traceLogger.hex8(read(0x9)) << "\n";
+            std::cout << "Address 0x000A (should read $70) " << traceLogger.hex8(read(0xA)) << "\n";
+            std::cout << "Address 0x000B (should read $01) " << traceLogger.hex8(read(0xB)) << "\n";
+            std::cout << "Address 0x000C (should read $01) " << traceLogger.hex8(read(0xC)) << "\n";
         }
 
 };
