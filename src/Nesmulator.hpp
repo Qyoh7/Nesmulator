@@ -1,4 +1,3 @@
-#include "TraceLogger.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -7,6 +6,8 @@
 #include <cstdint>
 #include <fstream>
 #include <string>
+#include <sstream>
+#include <iomanip>
 
 typedef uint8_t byte;
 typedef uint16_t word;
@@ -14,8 +15,6 @@ typedef uint16_t word;
 class Nesmulator
 {
     private:
-        TraceLogger traceLogger;
-
         word programCounter; 
         byte stackPointer;
         unsigned int cycles; // CPU cycles taken to excecute an instruction
@@ -81,7 +80,7 @@ class Nesmulator
         {
             while (!cpuHalted)
             {
-                std::cout << traceLogger.logLine(programCounter, read(programCounter), A, X, Y, stackPointer) << "\n";
+                std::cout << logLine(read(programCounter)) << "\n";
                 emulateCpu();
             }
         }
@@ -350,9 +349,10 @@ class Nesmulator
                     break;
 
                 case 0x10: // BPL
+                    tempByte = readByte();
                     if (!flagNegative)
                     {
-                        branch(readByte());
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -401,7 +401,7 @@ class Nesmulator
                     break;
                 
                 case 0x29: // AND Immediate
-                    A = opORA(readByte());
+                    A = opAND(readByte());
                     cycles = 2;
                     break;
 
@@ -427,9 +427,10 @@ class Nesmulator
                     break;
 
                 case 0x30: // BMI
+                    tempByte = readByte();
                     if (flagNegative)
                     {
-                        branch(readByte());
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -498,9 +499,10 @@ class Nesmulator
                     break;
 
                 case 0x50: // BVC
+                    tempByte = readByte();
                     if (!flagOverflow)
                     {
-                        branch(readByte());
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -526,7 +528,7 @@ class Nesmulator
                 
                 case 0x66: // ROR Zero Page
                     tempByte = readOperandsZeroPage();
-                    write(tempAddress, tempByte);
+                    write(tempAddress, opROR(tempByte));
                     cycles = 5;
                     break;
 
@@ -558,9 +560,10 @@ class Nesmulator
                     break;
 
                 case 0x70: // BVS
+                    tempByte = readByte();
                     if (flagOverflow)
                     {
-                        branch(readByte());
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -822,9 +825,10 @@ class Nesmulator
                     break;
 
                 case 0xF0: // BEQ
+                    tempByte = readByte();
                     if (flagZero)
                     {
-                        branch(readByte());
+                        branch(tempByte);
                         cycles = 3;
                     }
                     else {
@@ -838,7 +842,7 @@ class Nesmulator
                     break;
 
                 default:
-                    std::cerr << "Invalid opcode: $" << traceLogger.hex8(opCode) << "\n";
+                    std::cerr << "Invalid opcode: $" << hex8(opCode) << "\n";
                     break;
             }
         }
@@ -862,6 +866,64 @@ class Nesmulator
             run();
         }
 
+        std::string hex8(byte b)
+        {
+            std::stringstream ss;
+            ss << std::uppercase
+               << std::hex
+               << std::setw(2)
+               << std::setfill('0')
+               << static_cast<int>(b);
+            return ss.str();
+        }
+
+        std::string hex16(word w)
+        {
+            std::stringstream ss;
+            ss << std::uppercase
+               << std::hex
+               << std::setw(4)
+               << std::setfill('0')
+               << static_cast<int>(w);
+            return ss.str();
+        }
+
+        std::string logLine(byte opCode)
+        {
+            const std::array<std::string, 256> opcodeNames = {
+                "BRK","ORA","KIL","SLO","NOP","ORA","ASL","SLO","PHP","ORA","ASL","ANC","NOP","ORA","ASL","SLO",
+                "BPL","ORA","KIL","SLO","NOP","ORA","ASL","SLO","CLC","ORA","NOP","SLO","NOP","ORA","ASL","SLO",
+                "JSR","AND","KIL","RLA","BIT","AND","ROL","RLA","PLP","AND","ROL","ANC","BIT","AND","ROL","RLA",
+                "BMI","AND","KIL","RLA","NOP","AND","ROL","RLA","SEC","AND","NOP","RLA","NOP","AND","ROL","RLA",
+                "RTI","EOR","KIL","SRE","NOP","EOR","LSR","SRE","PHA","EOR","LSR","ALR","JMP","EOR","LSR","SRE",
+                "BVC","EOR","KIL","SRE","NOP","EOR","LSR","SRE","CLI","EOR","NOP","SRE","NOP","EOR","LSR","SRE",
+                "RTS","ADC","KIL","RRA","NOP","ADC","ROR","RRA","PLA","ADC","ROR","ARR","JMP","ADC","ROR","RRA",
+                "BVS","ADC","KIL","RRA","NOP","ADC","ROR","RRA","SEI","ADC","NOP","RRA","NOP","ADC","ROR","RRA",
+                "NOP","STA","NOP","SAX","STY","STA","STX","SAX","DEY","NOP","TXA","XAA","STY","STA","STX","SAX",
+                "BCC","STA","KIL","AHX","STY","STA","STX","SAX","TYA","STA","TXS","TAS","SHY","STA","SHX","AHX",
+                "LDY","LDA","LDX","LAX","LDY","LDA","LDX","LAX","TAY","LDA","TAX","LAX","LDY","LDA","LDX","LAX",
+                "BCS","LDA","KIL","LAX","LDY","LDA","LDX","LAX","CLV","LDA","TSX","LAS","LDY","LDA","LDX","LAX",
+                "CPY","CMP","NOP","DCP","CPY","CMP","DEC","DCP","INY","CMP","DEX","AXS","CPY","CMP","DEC","DCP",
+                "BNE","CMP","KIL","DCP","NOP","CMP","DEC","DCP","CLD","CMP","NOP","DCP","NOP","CMP","DEC","DCP",
+                "CPX","SBC","NOP","ISC","CPX","SBC","INC","ISC","INX","SBC","NOP","SBC","CPX","SBC","INC","ISC",
+                "BEQ","SBC","KIL","ISC","NOP","SBC","INC","ISC","SED","SBC","NOP","ISC","NOP","SBC","INC","ISC"
+            };
+            std::stringstream logLine; 
+            logLine << hex16(programCounter) << "    ";
+            logLine << hex8(opCode) << "    ";
+            logLine << opcodeNames[opCode] << "   ";
+            logLine << "A: " << hex8(A) << "    ";
+            logLine << "X: " << hex8(X) << "    ";
+            logLine << "Y: " << hex8(Y) << "    ";
+            logLine << "SP: " << hex8(stackPointer) << "    ";
+            logLine << (flagNegative ? "N" : "n");
+            logLine << (flagOverflow ? "V" : "v");
+            logLine << "--";
+            logLine << (flagDecimal ? "D" : "d");
+            logLine << (flagInterruptDisable ? "I" : "i");
+            logLine << (flagCarry ? "C" : "c");
+            return logLine.str();
+        }
         void test1()
         {
             reset();
@@ -899,19 +961,19 @@ class Nesmulator
             reset();
             std::cout << "\n" << "=====TEST RESULTS=====\n";
 
-            std::cout << "Address 0x0000 (should read $02) " << traceLogger.hex8(read(0x0)) << "\n";
-            std::cout << "Address 0x0001 (should read $01) " << traceLogger.hex8(read(0x1)) << "\n";
-            std::cout << "Address 0x0002 (should read $FD) " << traceLogger.hex8(read(0x2)) << "\n";
-            std::cout << "Address 0x0003 (should read $3D) " << traceLogger.hex8(read(0x3)) << "\n";
-            std::cout << "Address 0x0004 (should read $34) " << traceLogger.hex8(read(0x4)) << "\n";
-            std::cout << "Address 0x0005 (should read $05) " << traceLogger.hex8(read(0x5)) << "\n";
-            std::cout << "Address 0x0006 (should read $53) " << traceLogger.hex8(read(0x6)) << "\n";
-            std::cout << "Address 0x0007 (should read $11) " << traceLogger.hex8(read(0x7)) << "\n";
-            std::cout << "Address 0x0008 (should read $90) " << traceLogger.hex8(read(0x8)) << "\n";
-            std::cout << "Address 0x0009 (should read $F0) " << traceLogger.hex8(read(0x9)) << "\n";
-            std::cout << "Address 0x000A (should read $70) " << traceLogger.hex8(read(0xA)) << "\n";
-            std::cout << "Address 0x000B (should read $01) " << traceLogger.hex8(read(0xB)) << "\n";
-            std::cout << "Address 0x000C (should read $01) " << traceLogger.hex8(read(0xC)) << "\n";
+            std::cout << "Address 0x0000 (should read $02) " << hex8(read(0x0)) << "\n";
+            std::cout << "Address 0x0001 (should read $01) " << hex8(read(0x1)) << "\n";
+            std::cout << "Address 0x0002 (should read $FD) " << hex8(read(0x2)) << "\n";
+            std::cout << "Address 0x0003 (should read $3D) " << hex8(read(0x3)) << "\n";
+            std::cout << "Address 0x0004 (should read $34) " << hex8(read(0x4)) << "\n";
+            std::cout << "Address 0x0005 (should read $05) " << hex8(read(0x5)) << "\n";
+            std::cout << "Address 0x0006 (should read $53) " << hex8(read(0x6)) << "\n";
+            std::cout << "Address 0x0007 (should read $11) " << hex8(read(0x7)) << "\n";
+            std::cout << "Address 0x0008 (should read $90) " << hex8(read(0x8)) << "\n";
+            std::cout << "Address 0x0009 (should read $F0) " << hex8(read(0x9)) << "\n";
+            std::cout << "Address 0x000A (should read $70) " << hex8(read(0xA)) << "\n";
+            std::cout << "Address 0x000B (should read $01) " << hex8(read(0xB)) << "\n";
+            std::cout << "Address 0x000C (should read $01) " << hex8(read(0xC)) << "\n";
         }
 
 };

@@ -1,0 +1,98 @@
+8000    4C    JMP   A: 00    X: 00    Y: 00    SP: FD    nv--dIc
+8004    A2    LDX   A: 00    X: 00    Y: 00    SP: FD    nv--dIc
+8006    E8    INX   A: 00    X: 01    Y: 00    SP: FD    nv--dIc
+8007    86    STX   A: 00    X: 02    Y: 00    SP: FD    nv--dIc
+8009    CA    DEX   A: 00    X: 02    Y: 00    SP: FD    nv--dIc
+800A    8A    TXA   A: 00    X: 01    Y: 00    SP: FD    nv--dIc
+800B    A8    TAY   A: 01    X: 01    Y: 00    SP: FD    nv--dIc
+800C    84    STY   A: 01    X: 01    Y: 01    SP: FD    nv--dIc
+800E    BA    TSX   A: 01    X: 01    Y: 01    SP: FD    nv--dIc
+800F    86    STX   A: 01    X: FD    Y: 01    SP: FD    Nv--dIc
+8011    C8    INY   A: 01    X: FD    Y: 01    SP: FD    Nv--dIc
+8012    98    TYA   A: 01    X: FD    Y: 02    SP: FD    nv--dIc
+8013    AA    TAX   A: 02    X: FD    Y: 02    SP: FD    nv--dIc
+8014    9A    TXS   A: 02    X: 02    Y: 02    SP: FD    nv--dIc
+8015    08    PHP   A: 02    X: 02    Y: 02    SP: 02    nv--dIc
+8016    38    SEC   A: 02    X: 02    Y: 02    SP: 01    nv--dIc
+8017    F8    SED   A: 02    X: 02    Y: 02    SP: 01    nv--dIC
+8018    78    SEI   A: 02    X: 02    Y: 02    SP: 01    nv--DIC
+8019    08    PHP   A: 02    X: 02    Y: 02    SP: 01    nv--DIC
+801A    28    PLP   A: 02    X: 02    Y: 02    SP: 00    nv--DIC
+801B    28    PLP   A: 02    X: 02    Y: 02    SP: 01    nv--DIC
+801C    AD    LDA   A: 02    X: 02    Y: 02    SP: 02    nv--DIc
+801F    85    STA   A: 3D    X: 02    Y: 02    SP: 02    nv--DIc
+8021    AD    LDA   A: 3D    X: 02    Y: 02    SP: 02    nv--DIc
+8024    85    STA   A: 34    X: 02    Y: 02    SP: 02    nv--DIc
+8026    A2    LDX   A: 34    X: 02    Y: 02    SP: 02    nv--DIc
+8028    9A    TXS   A: 34    X: FD    Y: 02    SP: 02    Nv--DIc
+8029    EA    NOP   A: 34    X: FD    Y: 02    SP: FD    Nv--DIc
+802A    EA    NOP   A: 34    X: FD    Y: 02    SP: FD    Nv--DIc
+802B    EA    NOP   A: 34    X: FD    Y: 02    SP: FD    Nv--DIc
+802C    A9    LDA   A: 34    X: FD    Y: 02    SP: FD    Nv--DIc
+802E    0A    ASL   A: 81    X: FD    Y: 02    SP: FD    Nv--DIc
+802F    85    STA   A: 02    X: FD    Y: 02    SP: FD    nv--DIC
+8031    26    ROL   A: 02    X: FD    Y: 02    SP: FD    nv--DIC
+8033    A9    LDA   A: 02    X: FD    Y: 02    SP: FD    nv--DIc
+8035    29    AND   A: 7F    X: FD    Y: 02    SP: FD    nv--DIc
+8037    49    EOR   A: 70    X: FD    Y: 02    SP: FD    nv--DIc
+8039    09    ORA   A: 4C    X: FD    Y: 02    SP: FD    nv--DIc
+803B    85    STA   A: 4D    X: FD    Y: 02    SP: FD    nv--DIc
+803D    38    SEC   A: 4D    X: FD    Y: 02    SP: FD    nv--DIc
+803E    66    ROR   A: 4D    X: FD    Y: 02    SP: FD    nv--DIC
+8040    46    LSR   A: 4D    X: FD    Y: 02    SP: FD    Nv--DIC
+8042    A9    LDA   A: 4D    X: FD    Y: 02    SP: FD    nv--DIc
+8044    38    SEC   A: F0    X: FD    Y: 02    SP: FD    Nv--DIc
+8045    69    ADC   A: F0    X: FD    Y: 02    SP: FD    Nv--DIC
+8047    85    STA   A: 11    X: FD    Y: 02    SP: FD    nv--DIC
+8049    70    BVS   A: 11    X: FD    Y: 02    SP: FD    nv--DIC
+804B    B0    BCS   A: 11    X: FD    Y: 02    SP: FD    nv--DIC
+804E    A9    LDA   A: 11    X: FD    Y: 02    SP: FD    nv--DIC
+8050    18    CLC   A: 70    X: FD    Y: 02    SP: FD    nv--DIC
+8051    69    ADC   A: 70    X: FD    Y: 02    SP: FD    nv--DIc
+8053    85    STA   A: 90    X: FD    Y: 02    SP: FD    NV--DIc
+8055    B0    BCS   A: 90    X: FD    Y: 02    SP: FD    NV--DIc
+8057    70    BVS   A: 90    X: FD    Y: 02    SP: FD    NV--DIc
+805A    A9    LDA   A: 90    X: FD    Y: 02    SP: FD    NV--DIc
+805C    18    CLC   A: 11    X: FD    Y: 02    SP: FD    nV--DIc
+805D    E9    SBC   A: 11    X: FD    Y: 02    SP: FD    nV--DIc
+805F    85    STA   A: F0    X: FD    Y: 02    SP: FD    Nv--DIc
+8061    70    BVS   A: F0    X: FD    Y: 02    SP: FD    Nv--DIc
+8063    90    BCC   A: F0    X: FD    Y: 02    SP: FD    Nv--DIc
+8066    A9    LDA   A: F0    X: FD    Y: 02    SP: FD    Nv--DIc
+8068    38    SEC   A: 90    X: FD    Y: 02    SP: FD    Nv--DIc
+8069    E9    SBC   A: 90    X: FD    Y: 02    SP: FD    Nv--DIC
+806B    85    STA   A: 70    X: FD    Y: 02    SP: FD    nV--DIC
+806D    90    BCC   A: 70    X: FD    Y: 02    SP: FD    nV--DIC
+806F    70    BVS   A: 70    X: FD    Y: 02    SP: FD    nV--DIC
+8072    A9    LDA   A: 70    X: FD    Y: 02    SP: FD    nV--DIC
+8074    C9    CMP   A: 50    X: FD    Y: 02    SP: FD    nV--DIC
+8076    D0    BNE   A: 50    X: FD    Y: 02    SP: FD    nV--DIC
+8078    30    BMI   A: 50    X: FD    Y: 02    SP: FD    nV--DIC
+807A    90    BCC   A: 50    X: FD    Y: 02    SP: FD    nV--DIC
+807C    B8    CLV   A: 50    X: FD    Y: 02    SP: FD    nV--DIC
+807D    A9    LDA   A: 50    X: FD    Y: 02    SP: FD    nv--DIC
+807F    24    BIT   A: 70    X: FD    Y: 02    SP: FD    nv--DIC
+8081    10    BPL   A: 70    X: FD    Y: 02    SP: FD    NV--DIC
+8083    50    BVC   A: 70    X: FD    Y: 02    SP: FD    NV--DIC
+8085    F0    BEQ   A: 70    X: FD    Y: 02    SP: FD    NV--DIC
+8087    00    BRK   A: 70    X: FD    Y: 02    SP: FD    NV--DIC
+808C    A9    LDA   A: 70    X: FD    Y: 02    SP: FA    NV--DIC
+808E    85    STA   A: 01    X: FD    Y: 02    SP: FA    nV--DIC
+8090    40    RTI   A: 01    X: FD    Y: 02    SP: FA    nV--DIC
+8089    85    STA   A: 01    X: FD    Y: 02    SP: FD    NV--DIC
+808B    02    KIL   A: 01    X: FD    Y: 02    SP: FD    NV--DIC
+
+=====TEST RESULTS=====
+Address 0x0000 (should read $02) 02
+Address 0x0001 (should read $01) 01
+Address 0x0002 (should read $FD) FD
+Address 0x0003 (should read $3D) 3D
+Address 0x0004 (should read $34) 34
+Address 0x0005 (should read $05) 05
+Address 0x0006 (should read $53) 53
+Address 0x0007 (should read $11) 11
+Address 0x0008 (should read $90) 90
+Address 0x0009 (should read $F0) F0
+Address 0x000A (should read $70) 70
+Address 0x000B (should read $01) 01
+Address 0x000C (should read $01) 01
