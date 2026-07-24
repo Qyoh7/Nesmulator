@@ -23,7 +23,7 @@ class Nesmulator
         byte Y; // Indexing & Counting
 
         byte tempByte;
-        word tempAddress;
+        word addressBus;
 
         std::array<byte, 0x800> RAM; // Address $0000 to $07FF
         std::array<byte, 0x8000> ROM; // Address $8000 to $FFFF
@@ -65,7 +65,7 @@ class Nesmulator
             cycles = 0;
             stackPointer = 0xFD;
 
-            tempAddress = 0;
+            addressBus = 0;
             tempByte = 0;
 
             flagCarry = false;
@@ -151,14 +151,37 @@ class Nesmulator
 
         byte readOperandsZeroPage()
         {
-            tempAddress = readByte();
-            return read(tempAddress);
+            addressBus = readByte();
+            return read(addressBus);
+        }
+
+        byte readOperandsZeroPageIndexed(byte reg)
+        {
+            addressBus = readByte();
+            byte ret = read(addressBus);
+            addressBus += reg;
+            if (addressBus > 0xFF) addressBus -= 0x100;
+            return ret;
         }
 
         byte readOperandsAbsolute()
         {
-            tempAddress = readWord();
-            return read(tempAddress);
+            addressBus = readWord();
+            return read(addressBus);
+        }
+
+        byte readOperandsAbsoluteIndexed(byte reg)
+        {
+            addressBus = readWord();
+            byte ret = read(addressBus);
+            addressBus += reg;
+            return ret;
+        }
+
+        byte readOperandsIndirectIndexed(byte reg)
+        {
+            addressBus = readByte();
+            read(addressBus);
         }
 
         byte opLSR(byte value)
@@ -310,7 +333,7 @@ class Nesmulator
 
                 case 0x06: // ASL Zero page
                     tempByte = readOperandsZeroPage();
-                    write(tempAddress, opASL(tempByte));
+                    write(addressBus, opASL(tempByte));
                     cycles = 5;
                     break;
 
@@ -344,7 +367,7 @@ class Nesmulator
                     break;
 
                 case 0x0E: // ASL Absolute
-                    write(tempAddress, opASL(readOperandsAbsolute()));
+                    write(addressBus, opASL(readOperandsAbsolute()));
                     cycles = 6;
                     break;
 
@@ -366,10 +389,10 @@ class Nesmulator
                     break;
 
                 case 0x20: // JSR
-                    tempAddress = readWord(false);
+                    addressBus = readWord(false);
                     push(static_cast<byte>(programCounter / 0x100)); // Push PCH
                     push(static_cast<byte>(programCounter)); // Push PCL
-                    programCounter = tempAddress;
+                    programCounter = addressBus;
                     cycles = 6;
                     break;
 
@@ -385,7 +408,7 @@ class Nesmulator
 
                 case 0x26: // ROL Zero Page
                     tempByte = readOperandsZeroPage();
-                    write(tempAddress, opROL(tempByte));
+                    write(addressBus, opROL(tempByte));
                     cycles = 5;
                     break;
 
@@ -422,7 +445,7 @@ class Nesmulator
 
                 case 0x2E: // ROL Absolute
                     tempByte = readOperandsAbsolute();
-                    write(tempAddress, opROL(tempByte));
+                    write(addressBus, opROL(tempByte));
                     cycles = 6;
                     break;
 
@@ -462,7 +485,7 @@ class Nesmulator
 
                 case 0x46: // LSR Zero Page
                     tempByte = readOperandsZeroPage();
-                    write(tempAddress, opLSR(tempByte));
+                    write(addressBus, opLSR(tempByte));
                     cycles = 5;
                     break;
 
@@ -482,8 +505,8 @@ class Nesmulator
                     break;
 
                 case 0x4C: // JMP Absolute
-                    tempAddress = readWord(false);
-                    programCounter = tempAddress;
+                    addressBus = readWord(false);
+                    programCounter = addressBus;
                     cycles = 3;
                     break;
 
@@ -494,7 +517,7 @@ class Nesmulator
                 
                 case 0x4E: // LSR Absolute
                     tempByte = readOperandsAbsolute();
-                    write(tempAddress, opLSR(tempByte));
+                    write(addressBus, opLSR(tempByte));
                     cycles = 6;
                     break;
 
@@ -528,7 +551,7 @@ class Nesmulator
                 
                 case 0x66: // ROR Zero Page
                     tempByte = readOperandsZeroPage();
-                    write(tempAddress, opROR(tempByte));
+                    write(addressBus, opROR(tempByte));
                     cycles = 5;
                     break;
 
@@ -548,6 +571,12 @@ class Nesmulator
                     cycles = 2;
                     break;
 
+                case 0x6C: // JMP Indirect
+                    programCounter = readWord();
+                    programCounter = readWord();
+                    cycles = 5;
+                    break;
+
                 case 0x6D: // ADC Absolute
                     A = opADC(readOperandsAbsolute());
                     cycles = 4;
@@ -555,7 +584,7 @@ class Nesmulator
                 
                 case 0x6E: // ROR Absolute
                     tempByte = readOperandsAbsolute();
-                    write(tempAddress, opROR(tempByte));
+                    write(addressBus, opROR(tempByte));
                     cycles = 6;
                     break;
 
@@ -606,20 +635,20 @@ class Nesmulator
                     break;
 
                 case 0x8C: // STY Absolute
-                    tempAddress = readWord();
-                    write(tempAddress, Y);
+                    addressBus = readWord();
+                    write(addressBus, Y);
                     cycles = 4;
                     break;
 
                 case 0x8D: // STA Absolute
-                    tempAddress = readWord();
-                    write(tempAddress, A);
+                    addressBus = readWord();
+                    write(addressBus, A);
                     cycles = 4;
                     break;
 
                 case 0x8E: // STX Absolute
-                    tempAddress = readWord();
-                    write(tempAddress, X);
+                    addressBus = readWord();
+                    write(addressBus, X);
                     cycles = 4;
                     break;
 
@@ -789,7 +818,7 @@ class Nesmulator
 
                 case 0xE6: // INC Zero Page
                     tempByte = readOperandsZeroPage();
-                    write(tempAddress, opINC(tempByte));
+                    write(addressBus, opINC(tempByte));
                     cycles = 5;
                     break;
 
@@ -820,7 +849,7 @@ class Nesmulator
 
                 case 0xEE: // INC Absolute
                     tempByte = readOperandsAbsolute();
-                    write(tempAddress, tempByte);
+                    write(addressBus, tempByte);
                     cycles = 6;
                     break;
 
